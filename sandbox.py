@@ -2,10 +2,12 @@ import cv2
 import torch
 import numpy as np
 import sys
+import matplotlib.pyplot as plt
 
 from depth_anything_v2.dpt import DepthAnythingV2
 
 DEVICE = 'cuda' if torch.cuda.is_available() else 'mps' if torch.backends.mps.is_available() else 'cpu'
+print('Running on', DEVICE)
 
 model_configs = {
     'vits': {'encoder': 'vits', 'features': 64, 'out_channels': [48, 96, 192, 384]},
@@ -20,7 +22,7 @@ model = DepthAnythingV2(**model_configs[encoder])
 model.load_state_dict(torch.load(f'checkpoints/depth_anything_v2_{encoder}.pth', map_location='cpu',weights_only=True))
 model = model.to(DEVICE).eval()
 
-input_path = 'figures/gape.png'
+input_path = 'figures/rock.png'
 fname_header = input_path.split('.')[0]
 
 def save_1chan_image(np_array, label):
@@ -28,7 +30,7 @@ def save_1chan_image(np_array, label):
     np_array = np_array / np_array.max()
     np_array = (np_array * 255).astype(np.uint8)
     image = np.repeat(np_array[:, :, np.newaxis], 3, axis=2) # HxWx3 depth image in numpy
-    cv2.imwrite('%s_%s.png'%(fname_header,label), image)
+    # cv2.imwrite('%s_%s.png'%(fname_header,label), image)
 
 raw_img = cv2.imread(input_path)
 print('raw_img shape: ', raw_img.shape)
@@ -65,5 +67,26 @@ range_angle_image = np.concatenate(histograms, axis=1) # (range_bins, angle_bins
 
 # save range-angle image as image
 save_1chan_image(range_angle_image[:-5], 'range-angle')
+
+# numpy subfigure plots showing the raw image, depth map, adjusted depth map, and range-angle image
+plt.subplot(2,2,1)
+plt.imshow(cv2.cvtColor(raw_img, cv2.COLOR_BGR2RGB))
+plt.title('Raw Image')
+
+plt.subplot(2,2,2)
+plt.imshow(depth, cmap='plasma')
+plt.title('Raw Depth Map\nMin: %.2f, Max: %.2f'%(depth.min(), depth.max()))
+
+plt.subplot(2,2,3)
+plt.imshow(adjusted_depth, cmap='plasma')
+plt.title('Adjusted Depth Map\nMin: %.2f, Max: %.2f'%(adjusted_depth.min(), adjusted_depth.max()))
+
+plt.subplot(2,2,4)
+plt.imshow(range_angle_image, cmap='plasma')
+plt.title('Range-Angle Image')
+
+plt.savefig('%s_subplots.png'%fname_header)
+plt.close()
+
 
 
