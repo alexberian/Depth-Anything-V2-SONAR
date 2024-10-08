@@ -5,6 +5,7 @@ import torch
 import numpy as np
 import sys
 import matplotlib.pyplot as plt
+import tqdm
 
 from depth_anything_v2.dpt import DepthAnythingV2
 
@@ -28,13 +29,6 @@ def get_model():
 
     return model
 
-
-def save_1chan_image(np_array, label):
-    np_array = np_array - np_array.min()
-    np_array = np_array / np_array.max()
-    np_array = (np_array * 255).astype(np.uint8)
-    image = np.repeat(np_array[:, :, np.newaxis], 3, axis=2) # HxWx3 depth image in numpy
-    cv2.imwrite('%s_%s.png'%(fname_header,label), image)
 
 
 def infer_sonar_img(input_path, model):
@@ -69,8 +63,17 @@ def infer_sonar_img(input_path, model):
 
 
 def infer_sonar_on_srn_obj(obj_path, model):
+    # delete sonar folder if it exists
+    if os.path.exists(os.path.join(obj_path, 'sonar')):
+        for fname in os.listdir(os.path.join(obj_path, 'sonar')):
+            os.remove(os.path.join(obj_path, 'sonar', fname))
+        os.rmdir(os.path.join(obj_path, 'sonar'))
+
     # make 'sonar' folder
-    os.makedir(os.path.join(obj_path, 'sonar'))
+    os.mkdir(os.path.join(obj_path, 'sonar'))
+
+    # print info
+    print('Generating sonar data in %s...'%(obj_path))
 
     # loop through all images in the rgb folder
     rgb_fnames = os.listdir(os.path.join(obj_path, 'rgb'))
@@ -79,6 +82,12 @@ def infer_sonar_on_srn_obj(obj_path, model):
         
         # calculate the sonar image
         sonar_image = infer_sonar_img(input_path, model)
+
+        # fit the image between 0 and 255
+        sonar_image = (sonar_image - sonar_image.min()) / (sonar_image.max() - sonar_image.min()) * 255
+
+        # convert to uint8
+        sonar_image = sonar_image.astype(np.uint8)
 
         # repeat over 3 channels
         sonar_image = np.repeat(sonar_image[:, :, np.newaxis], 3, axis=2)
