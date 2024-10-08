@@ -72,9 +72,6 @@ def infer_sonar_on_srn_obj(obj_path, model):
     # make 'sonar' folder
     os.mkdir(os.path.join(obj_path, 'sonar'))
 
-    # print info
-    print('Generating sonar data in %s...'%(obj_path))
-
     # loop through all images in the rgb folder
     rgb_fnames = os.listdir(os.path.join(obj_path, 'rgb'))
     for fname in rgb_fnames:
@@ -99,7 +96,8 @@ def infer_sonar_on_srn_obj(obj_path, model):
 def infer_sonar_on_srn_dataset(dataset_path, model):
     # loop through all objects in the dataset
     obj_fnames = os.listdir(dataset_path)
-    for fname in obj_fnames:
+    print('Processing %d objects in %s...'%(len(obj_fnames), dataset_path))
+    for fname in tqdm.tqdm(obj_fnames):
         obj_path = os.path.join(dataset_path, fname)
         infer_sonar_on_srn_obj(obj_path, model)
     
