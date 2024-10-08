@@ -31,16 +31,21 @@ def get_model():
 
 
 
-def infer_sonar_img(input_path, model):
+
+def infer_sonar_img(input_path, model, plot=False):
 
     # load raw image
     raw_img = cv2.imread(input_path)
     depth = model.infer_image(raw_img) # HxW raw depth map in numpy
 
+    # get a mask of all white pixels
+    white_mask = np.all(raw_img == 255, axis=2) # (H,W)
+
     # create range-angle image
     range_bins = raw_img.shape[0]
     angle_bins = raw_img.shape[1]
 
+    # adjust depth such that closer objects are dimmer, and fits between 0 and 1
     adjusted_depth = depth - depth.min()
     adjusted_depth = adjusted_depth / adjusted_depth.max()
     adjusted_depth = 1 - adjusted_depth
@@ -48,21 +53,46 @@ def infer_sonar_img(input_path, model):
     range_bin_edges = np.linspace(adjusted_depth.min(), adjusted_depth.max(), range_bins + 1)
     angle_bin_edges = np.linspace(0,adjusted_depth.shape[1], angle_bins + 1)
 
+    # create range-angle image
     histograms = []
     for angle in range(angle_bins):
         min_col = int(angle_bin_edges[angle])
         max_col = int(angle_bin_edges[angle + 1])
         image_slice = adjusted_depth[:, min_col:max_col]
         flattened_slice = image_slice.flatten()
+
+        # remove white pixels
+        mask_slice = white_mask[:, min_col:max_col].flatten()
+        flattened_slice = flattened_slice[~mask_slice]
+
         range_hist, _ = np.histogram(flattened_slice, bins=range_bin_edges)
         histograms.append(range_hist.reshape(-1, 1)) # (range_bins, 1)
 
     range_angle_image = np.concatenate(histograms, axis=1) # (range_bins, angle_bins)
 
+    # plot the range-angle image, raw image, adjusted depth map, and white mask
+    if plot:
+        print('Plotting example...')
+
+        # plt.subplot(2, 2, 1)
+        # plt.imshow(raw_img)
+        # plt.title('Raw Image')
+        # plt.subplot(2, 2, 2)
+        # plt.imshow(adjusted_depth)
+        # plt.title('Adjusted Depth Map')
+        # plt.subplot(2, 2, 3)
+        # plt.imshow(white_mask)
+        # plt.title('White Mask')
+        # plt.subplot(2, 2, 4)
+        # plt.imshow(range_angle_image)
+        # plt.title('Range-Angle Image')
+        # plt.savefig('figures/sonar_example.png')
+        # plt.close()
+
     return range_angle_image
 
 
-def infer_sonar_on_srn_obj(obj_path, model):
+def infer_sonar_on_srn_obj(obj_path, model, plot_first_image=False):
     # delete sonar folder if it exists
     if os.path.exists(os.path.join(obj_path, 'sonar')):
         for fname in os.listdir(os.path.join(obj_path, 'sonar')):
@@ -78,7 +108,8 @@ def infer_sonar_on_srn_obj(obj_path, model):
         input_path = os.path.join(obj_path, 'rgb', fname)
         
         # calculate the sonar image
-        sonar_image = infer_sonar_img(input_path, model)
+        sonar_image = infer_sonar_img(input_path, model,plot=plot_first_image)
+        plot_first_image = False
 
         # fit the image between 0 and 255
         sonar_image = (sonar_image - sonar_image.min()) / (sonar_image.max() - sonar_image.min()) * 255
@@ -97,9 +128,11 @@ def infer_sonar_on_srn_dataset(dataset_path, model):
     # loop through all objects in the dataset
     obj_fnames = os.listdir(dataset_path)
     print('Processing %d objects in %s...'%(len(obj_fnames), dataset_path))
+    plot_first_image = True
     for fname in tqdm.tqdm(obj_fnames):
         obj_path = os.path.join(dataset_path, fname)
-        infer_sonar_on_srn_obj(obj_path, model)
+        infer_sonar_on_srn_obj(obj_path, model, plot_first_image=plot_first_image)
+        plot_first_image = False
     
 
 if __name__ == '__main__':
