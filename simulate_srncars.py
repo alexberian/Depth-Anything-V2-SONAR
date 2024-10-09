@@ -45,9 +45,11 @@ def infer_sonar_img(input_path, model, plot=False):
     range_bins = raw_img.shape[0]
     angle_bins = raw_img.shape[1]
 
-    # adjust depth such that closer objects are dimmer, and fits between 0 and 1
-    adjusted_depth = depth - depth.min()
-    adjusted_depth = adjusted_depth / adjusted_depth.max()
+    # adjust depth map
+    # non-white pixels fit between 0 and 1
+    # far means 1, close means 0
+    adjusted_depth = depth - depth[~white_mask].min()
+    adjusted_depth = adjusted_depth / adjusted_depth[~white_mask].max()
     adjusted_depth = 1 - adjusted_depth
 
     range_bin_edges = np.linspace(adjusted_depth.min(), adjusted_depth.max(), range_bins + 1)
@@ -72,27 +74,27 @@ def infer_sonar_img(input_path, model, plot=False):
 
     # plot the range-angle image, raw image, adjusted depth map, and white mask
     if plot:
-        print('Plotting example...')
-
-        # plt.subplot(2, 2, 1)
-        # plt.imshow(raw_img)
-        # plt.title('Raw Image')
-        # plt.subplot(2, 2, 2)
-        # plt.imshow(adjusted_depth)
-        # plt.title('Adjusted Depth Map')
-        # plt.subplot(2, 2, 3)
-        # plt.imshow(white_mask)
-        # plt.title('White Mask')
-        # plt.subplot(2, 2, 4)
-        # plt.imshow(range_angle_image)
-        # plt.title('Range-Angle Image')
-        # plt.savefig('figures/sonar_example.png')
-        # plt.close()
+        print('Plotting example %s...'%input_path)
+        plt.subplot(2, 2, 1)
+        plt.imshow(raw_img)
+        plt.title('Raw Image')
+        plt.subplot(2, 2, 2)
+        plt.imshow(adjusted_depth)
+        plt.title('Adjusted Depth Map')
+        plt.subplot(2, 2, 3)
+        plt.imshow(white_mask)
+        plt.title('White Mask')
+        plt.subplot(2, 2, 4)
+        plt.imshow(range_angle_image)
+        plt.title('Range-Angle Image')
+        plt.savefig('figures/sonar_example.png')
+        plt.close()
 
     return range_angle_image
 
 
 def infer_sonar_on_srn_obj(obj_path, model, plot_first_image=False):
+
     # delete sonar folder if it exists
     if os.path.exists(os.path.join(obj_path, 'sonar')):
         for fname in os.listdir(os.path.join(obj_path, 'sonar')):
@@ -124,11 +126,10 @@ def infer_sonar_on_srn_obj(obj_path, model, plot_first_image=False):
         cv2.imwrite(os.path.join(obj_path, 'sonar', fname), sonar_image)
 
 
-def infer_sonar_on_srn_dataset(dataset_path, model):
+def infer_sonar_on_srn_dataset(dataset_path, model, plot_first_image=False):
     # loop through all objects in the dataset
     obj_fnames = os.listdir(dataset_path)
     print('Processing %d objects in %s...'%(len(obj_fnames), dataset_path))
-    plot_first_image = True
     for fname in tqdm.tqdm(obj_fnames):
         obj_path = os.path.join(dataset_path, fname)
         infer_sonar_on_srn_obj(obj_path, model, plot_first_image=plot_first_image)
@@ -136,7 +137,11 @@ def infer_sonar_on_srn_dataset(dataset_path, model):
     
 
 if __name__ == '__main__':
-    model = get_model()
+
     dataset_paths = [os.path.join('/home/berian/Documents/shapenet', s) for s in ['cars_train', 'cars_val', 'cars_test']]
+    plot_first_image = True
+
+    model = get_model()
     for dataset_path in dataset_paths:
-        infer_sonar_on_srn_dataset(dataset_path, model)
+        infer_sonar_on_srn_dataset(dataset_path, model, plot_first_image=plot_first_image)
+        plot_first_image = False
